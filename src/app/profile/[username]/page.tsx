@@ -24,42 +24,32 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
         data: { user },
     } = await supabase.auth.getUser();
 
-    // Get current user's profile for Navbar
-    let currentUserProfile = null;
-    if (user) {
-        const { data } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', user.id)
-            .single();
-        currentUserProfile = data;
-    }
+    // Fetch profile being viewed and current user profile in parallel
+    const [profileResult, currentUserProfileResult] = await Promise.all([
+        supabase.from('profiles').select('*').eq('username', username).single(),
+        user ? supabase.from('profiles').select('*').eq('id', user.id).single() : Promise.resolve({ data: null }),
+    ]);
 
-    // Get profile being viewed by username
-    const { data: profile, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('username', username)
-        .single();
+    const profile = profileResult.data;
+    const currentUserProfile = currentUserProfileResult.data;
 
-    if (error || !profile) {
+    if (profileResult.error || !profile) {
         notFound();
     }
 
     const isOwnProfile = user?.id === profile.id;
 
-    // Get user's posts
-    const postsResult = await getUserPosts(profile.id, 20, 0);
-    const userPosts = (postsResult.success && postsResult.data) ? postsResult.data : [];
+    // Fetch posts, follow counts, and following status in parallel
+    const [postsResult, followCountsResult, isFollowingResult] = await Promise.all([
+        getUserPosts(profile.id, 20, 0),
+        getFollowCounts(profile.id),
+        user ? isFollowing(profile.id) : Promise.resolve(null),
+    ]);
 
-    // Get follow counts
-    const followCountsResult = await getFollowCounts(profile.id);
+    const userPosts = (postsResult.success && postsResult.data) ? postsResult.data : [];
     const followCounts = followCountsResult.success
         ? followCountsResult.data
         : { follower_count: 0, following_count: 0 };
-
-    // Check if current user is following this profile
-    const isFollowingResult = user ? await isFollowing(profile.id) : null;
     const userIsFollowing = isFollowingResult?.success ? isFollowingResult.data.isFollowing : false;
 
     return (
@@ -107,7 +97,7 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
                                     </div>
                                 )}
                                 {isOwnProfile && (
-                                    <Link href="/settings/profile">
+                                    <Link href="/profile/edit">
                                         <Button variant="outline" size="sm">
                                             Edit Profile
                                         </Button>

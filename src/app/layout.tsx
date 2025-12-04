@@ -4,6 +4,7 @@ import { Inter } from 'next/font/google';
 import './globals.css';
 import { NotificationProvider } from '@/contexts/NotificationProvider';
 import { NavigationProgress } from '@/components/ui/NavigationProgress';
+import { SessionManager } from '@/components/auth/session-manager';
 
 const inter = Inter({
     subsets: ['latin'],
@@ -43,12 +44,19 @@ export default function RootLayout({
 }>) {
     return (
         <html lang="en" suppressHydrationWarning>
+            <head>
+                {/* Preconnect to Supabase for faster API calls */}
+                <link rel="preconnect" href="https://jpzcuudpoepsjawreoic.supabase.co" />
+                <link rel="dns-prefetch" href="https://jpzcuudpoepsjawreoic.supabase.co" />
+            </head>
             <body className={`${inter.variable} font-sans antialiased`}>
                 <NotificationProvider>
-                    <Suspense fallback={null}>
-                        <NavigationProgress />
-                    </Suspense>
-                    {children}
+                    <SessionManager>
+                        <Suspense fallback={null}>
+                            <NavigationProgress />
+                        </Suspense>
+                        {children}
+                    </SessionManager>
                 </NotificationProvider>
             </body>
         </html>

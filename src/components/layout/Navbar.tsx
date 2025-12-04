@@ -66,10 +66,10 @@ export function Navbar({ user }: NavbarProps) {
 
                         <div className="flex items-center gap-2">
                             {navItems.map((item) => (
-                                <Link key={item.href} href={item.href}>
+                                <Link key={item.href} href={item.href} prefetch={true}>
                                     <Button
                                         variant={isActive(item.href) ? 'default' : 'ghost'}
-                                        className="gap-2"
+                                        className="gap-2 transition-transform active:scale-95"
                                     >
                                         <item.icon className="h-4 w-4" />
                                         {item.label}
@@ -118,7 +118,8 @@ export function Navbar({ user }: NavbarProps) {
                             <Link
                                 key={item.href}
                                 href={item.href}
-                                className={`flex flex-col items-center justify-center w-full h-full space-y-1 ${active
+                                prefetch={true}
+                                className={`flex flex-col items-center justify-center w-full h-full space-y-1 transition-transform active:scale-90 ${active
                                     ? 'text-primary-600 dark:text-primary-400'
                                     : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
                                     }`}

@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import type { PostWithInteractions } from '@/types/database.types';
 import { PostCard } from './post-card';
 import { EditPostModal } from './edit-post-modal';
+import { ScrollReveal } from '@/components/ui/scroll-animations';
 import { getFollowingPosts, getPublicPosts } from '@/lib/actions/posts';
 
 interface PostFeedProps {
@@ -51,54 +52,67 @@ export function PostFeed({ initialPosts = [], currentUserId, feedType }: PostFee
 
     if (posts.length === 0 && !loading) {
         return (
-            <div className="rounded-2xl border border-gray-200 bg-white p-12 text-center shadow-sm dark:border-gray-700 dark:bg-gray-800">
-                <div className="mx-auto max-w-md">
-                    <div className="mb-4 text-6xl">📝</div>
-                    <h3 className="mb-2 text-xl font-semibold text-gray-900 dark:text-white">
-                        No posts yet
-                    </h3>
-                    <p className="text-gray-600 dark:text-gray-400">
-                        Be the first to share something with the community!
-                    </p>
+            <ScrollReveal direction="up" duration={0.6}>
+                <div className="rounded-2xl border border-gray-200 bg-white p-12 text-center shadow-sm dark:border-gray-700 dark:bg-gray-800">
+                    <div className="mx-auto max-w-md">
+                        <div className="mb-4 text-6xl">📝</div>
+                        <h3 className="mb-2 text-xl font-semibold text-gray-900 dark:text-white">
+                            No posts yet
+                        </h3>
+                        <p className="text-gray-600 dark:text-gray-400">
+                            Be the first to share something with the community!
+                        </p>
+                    </div>
                 </div>
-            </div>
+            </ScrollReveal>
         );
     }
 
     return (
         <>
             <div className="space-y-4">
-                {posts.map((post) => (
-                    <PostCard
+                {posts.map((post, index) => (
+                    <ScrollReveal
                         key={post.id}
-                        post={post}
-                        currentUserId={currentUserId}
-                        onEdit={setEditingPost}
-                    />
+                        direction="up"
+                        delay={Math.min(index * 0.03, 0.15)} // Fast staggered delay
+                        duration={0.3}
+                        distance={20}
+                    >
+                        <PostCard
+                            post={post}
+                            currentUserId={currentUserId}
+                            onEdit={setEditingPost}
+                        />
+                    </ScrollReveal>
                 ))}
 
                 {loading && (
-                    <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-800">
-                        <div className="animate-pulse space-y-4">
-                            <div className="flex items-center gap-3">
-                                <div className="h-12 w-12 rounded-full bg-gray-200 dark:bg-gray-700"></div>
-                                <div className="flex-1 space-y-2">
-                                    <div className="h-4 w-32 rounded bg-gray-200 dark:bg-gray-700"></div>
-                                    <div className="h-3 w-24 rounded bg-gray-200 dark:bg-gray-700"></div>
+                    <ScrollReveal direction="up" duration={0.3}>
+                        <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+                            <div className="animate-pulse space-y-4">
+                                <div className="flex items-center gap-3">
+                                    <div className="h-12 w-12 rounded-full bg-gray-200 dark:bg-gray-700"></div>
+                                    <div className="flex-1 space-y-2">
+                                        <div className="h-4 w-32 rounded bg-gray-200 dark:bg-gray-700"></div>
+                                        <div className="h-3 w-24 rounded bg-gray-200 dark:bg-gray-700"></div>
+                                    </div>
+                                </div>
+                                <div className="space-y-2">
+                                    <div className="h-4 rounded bg-gray-200 dark:bg-gray-700"></div>
+                                    <div className="h-4 w-5/6 rounded bg-gray-200 dark:bg-gray-700"></div>
                                 </div>
                             </div>
-                            <div className="space-y-2">
-                                <div className="h-4 rounded bg-gray-200 dark:bg-gray-700"></div>
-                                <div className="h-4 w-5/6 rounded bg-gray-200 dark:bg-gray-700"></div>
-                            </div>
                         </div>
-                    </div>
+                    </ScrollReveal>
                 )}
 
                 {!hasMore && posts.length > 0 && (
-                    <p className="py-4 text-center text-sm text-gray-500 dark:text-gray-400">
-                        You&apos;ve reached the end!
-                    </p>
+                    <ScrollReveal direction="up" duration={0.4}>
+                        <p className="py-4 text-center text-sm text-gray-500 dark:text-gray-400">
+                            You&apos;ve reached the end!
+                        </p>
+                    </ScrollReveal>
                 )}
             </div>
 
@@ -108,3 +122,4 @@ export function PostFeed({ initialPosts = [], currentUserId, feedType }: PostFee
         </>
     );
 }
+

@@ -73,8 +73,13 @@ export async function signUp(
 
 /**
  * Sign in an existing user
+ * @param persistSession - If true, session persists across browser restarts
  */
-export async function signIn(email: string, password: string): Promise<AuthResult> {
+export async function signIn(
+    email: string,
+    password: string,
+    persistSession: boolean = true
+): Promise<AuthResult> {
     try {
         const supabase = await createClient();
 
@@ -89,6 +94,10 @@ export async function signIn(email: string, password: string): Promise<AuthResul
                 error: error.message,
             };
         }
+
+        // If user doesn't want to stay signed in, set a shorter session
+        // Note: Supabase handles session persistence via cookies
+        // We'll store the preference in localStorage on the client side
 
         revalidatePath('/', 'layout');
         return { success: true };

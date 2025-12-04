@@ -15,15 +15,13 @@ export default async function FeedPage() {
         redirect('/login');
     }
 
-    // Get user profile
-    const { data: profile } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .single();
+    // Fetch profile and posts in parallel for faster loading
+    const [profileResult, postsResult] = await Promise.all([
+        supabase.from('profiles').select('*').eq('id', user.id).single(),
+        getFollowingPosts(10, 0),
+    ]);
 
-    // Get initial posts from followed users
-    const postsResult = await getFollowingPosts(10, 0);
+    const profile = profileResult.data;
     const initialPosts = (postsResult.success && postsResult.data) ? postsResult.data : [];
 
     return (

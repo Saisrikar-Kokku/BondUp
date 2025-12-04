@@ -15,20 +15,14 @@ export default async function DiscoverPage() {
         notFound();
     }
 
-    // Get user profile
-    const { data: profile } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .single();
+    // Fetch profile and following list in parallel
+    const [profileResult, followingResult] = await Promise.all([
+        supabase.from('profiles').select('*').eq('id', user.id).single(),
+        supabase.from('followers').select('following_id').eq('follower_id', user.id),
+    ]);
 
-    // Get users that the current user is NOT following
-    const { data: following } = await supabase
-        .from('followers')
-        .select('following_id')
-        .eq('follower_id', user.id);
-
-    const followingIds = following?.map((f) => f.following_id) || [];
+    const profile = profileResult.data;
+    const followingIds = followingResult.data?.map((f) => f.following_id) || [];
     followingIds.push(user.id); // Exclude self
 
     // Get suggested users (users not being followed, newest first)

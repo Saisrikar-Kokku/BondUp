@@ -28,15 +28,13 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
         redirect('/login');
     }
 
-    // Get user profile for Navbar
-    const { data: profile } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .single();
+    // Fetch profile and following IDs in parallel for faster loading
+    const [profileResult, followingIds] = await Promise.all([
+        supabase.from('profiles').select('*').eq('id', user.id).single(),
+        getFollowingIds(user.id),
+    ]);
 
-    // Get following IDs for follow status check
-    const followingIds = await getFollowingIds(user.id);
+    const profile = profileResult.data;
 
     let results = [];
     const hasSearched = !!query;

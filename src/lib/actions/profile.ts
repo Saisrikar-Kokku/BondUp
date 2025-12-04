@@ -128,14 +128,19 @@ export async function updateProfile(updates: ProfileUpdate): Promise<ProfileResu
             .single();
 
         if (error) {
+            console.error('Profile update error:', error);
             return {
                 success: false,
                 error: error.message,
             };
         }
 
+        // Revalidate all profile-related pages
         revalidatePath('/profile/[username]', 'page');
         revalidatePath('/profile/edit', 'page');
+        revalidatePath('/feed', 'page');
+        revalidatePath('/discover', 'page');
+        revalidatePath('/explore', 'page');
 
         return {
             success: true,

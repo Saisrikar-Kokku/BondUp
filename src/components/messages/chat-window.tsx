@@ -1,9 +1,10 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { sendMessage, markConversationAsRead } from '@/lib/actions/messages';
 import { MessageBubble } from './message-bubble';
+import { TypingStatus } from './typing-indicator';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Send, ArrowLeft } from 'lucide-react';
@@ -20,8 +21,10 @@ export function ChatWindow({ conversationId, initialMessages, currentUserId, oth
     const [messages, setMessages] = useState(initialMessages);
     const [newMessage, setNewMessage] = useState('');
     const [isSending, setIsSending] = useState(false);
+    const [isOtherUserTyping, setIsOtherUserTyping] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
-    // Use useState to ensure client is created once per component lifecycle
+    const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+    const lastTypingBroadcast = useRef<number>(0);
     const [supabase] = useState(() => createClient());
 
     const scrollToBottom = () => {
@@ -30,16 +33,52 @@ export function ChatWindow({ conversationId, initialMessages, currentUserId, oth
 
     useEffect(() => {
         scrollToBottom();
-    }, [messages]);
+    }, [messages, isOtherUserTyping]);
 
     useEffect(() => {
-        // Mark as read on mount
         markConversationAsRead(conversationId);
     }, [conversationId]);
 
+    // Broadcast typing status
+    const broadcastTyping = useCallback(() => {
+        const now = Date.now();
+        // Throttle broadcasts to every 2 seconds
+        if (now - lastTypingBroadcast.current < 2000) return;
+        lastTypingBroadcast.current = now;
+
+        supabase.channel(`typing:${conversationId}`).send({
+            type: 'broadcast',
+            event: 'typing',
+            payload: { userId: currentUserId, isTyping: true }
+        });
+    }, [conversationId, currentUserId, supabase]);
+
+    // Handle input change with typing broadcast
+    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        setNewMessage(e.target.value);
+
+        if (e.target.value.trim()) {
+            broadcastTyping();
+
+            // Clear existing timeout
+            if (typingTimeoutRef.current) {
+                clearTimeout(typingTimeoutRef.current);
+            }
+
+            // Set timeout to stop typing indicator after 3 seconds of no input
+            typingTimeoutRef.current = setTimeout(() => {
+                supabase.channel(`typing:${conversationId}`).send({
+                    type: 'broadcast',
+                    event: 'typing',
+                    payload: { userId: currentUserId, isTyping: false }
+                });
+            }, 3000);
+        }
+    };
+
     useEffect(() => {
-        // Subscribe to new messages
-        const channel = supabase
+        // Subscribe to messages
+        const messagesChannel = supabase
             .channel(`conversation:${conversationId}`)
             .on(
                 'postgres_changes',
@@ -52,14 +91,12 @@ export function ChatWindow({ conversationId, initialMessages, currentUserId, oth
                 (payload) => {
                     const newMsg = payload.new;
                     setMessages((prev) => {
-                        // Check if message already exists (deduplication)
                         if (prev.some(m => m.id === newMsg.id)) {
                             return prev;
                         }
                         return [...prev, newMsg];
                     });
 
-                    // Mark as read if it's from other user AND window is focused
                     if (newMsg.sender_id !== currentUserId && document.hasFocus()) {
                         markConversationAsRead(conversationId);
                     }
@@ -94,8 +131,28 @@ export function ChatWindow({ conversationId, initialMessages, currentUserId, oth
             )
             .subscribe();
 
+        // Subscribe to typing indicator
+        const typingChannel = supabase
+            .channel(`typing:${conversationId}`)
+            .on('broadcast', { event: 'typing' }, (payload) => {
+                const { userId, isTyping } = payload.payload;
+                if (userId !== currentUserId) {
+                    setIsOtherUserTyping(isTyping);
+
+                    // Auto-hide typing indicator after 5 seconds (safety net)
+                    if (isTyping) {
+                        setTimeout(() => setIsOtherUserTyping(false), 5000);
+                    }
+                }
+            })
+            .subscribe();
+
         return () => {
-            supabase.removeChannel(channel);
+            supabase.removeChannel(messagesChannel);
+            supabase.removeChannel(typingChannel);
+            if (typingTimeoutRef.current) {
+                clearTimeout(typingTimeoutRef.current);
+            }
         };
     }, [conversationId, supabase, currentUserId]);
 
@@ -103,8 +160,17 @@ export function ChatWindow({ conversationId, initialMessages, currentUserId, oth
         e.preventDefault();
         if (!newMessage.trim() || isSending) return;
 
+        // Stop typing indicator when message is sent
+        if (typingTimeoutRef.current) {
+            clearTimeout(typingTimeoutRef.current);
+        }
+        supabase.channel(`typing:${conversationId}`).send({
+            type: 'broadcast',
+            event: 'typing',
+            payload: { userId: currentUserId, isTyping: false }
+        });
+
         setIsSending(true);
-        // Optimistic update
         const tempId = Date.now().toString();
         const tempMessage = {
             id: tempId,
@@ -120,19 +186,14 @@ export function ChatWindow({ conversationId, initialMessages, currentUserId, oth
         const result = await sendMessage(conversationId, tempMessage.content);
 
         if (!result.success) {
-            // Revert optimistic update on failure
             setMessages((prev) => prev.filter(m => m.id !== tempId));
             console.error('Failed to send message');
         } else {
-            // Replace temp message with real one
             setMessages((prev) => {
                 const realMsg = result.data;
-                // Check if real message was already added by subscription
                 if (prev.some(m => m.id === realMsg.id)) {
-                    // If yes, just remove the temp message
                     return prev.filter(m => m.id !== tempId);
                 }
-                // If no, replace temp with real
                 return prev.map(m => m.id === tempId ? realMsg : m);
             });
         }
@@ -166,7 +227,13 @@ export function ChatWindow({ conversationId, initialMessages, currentUserId, oth
                         <h3 className="font-semibold text-gray-900 dark:text-white truncate">
                             {otherUser.full_name || otherUser.username}
                         </h3>
-                        <p className="text-xs text-gray-500 dark:text-gray-400 truncate">@{otherUser.username}</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                            {isOtherUserTyping ? (
+                                <span className="text-primary-500 font-medium">typing...</span>
+                            ) : (
+                                `@${otherUser.username}`
+                            )}
+                        </p>
                     </div>
                 </Link>
             </div>
@@ -189,6 +256,14 @@ export function ChatWindow({ conversationId, initialMessages, currentUserId, oth
                         />
                     );
                 })}
+
+                {/* Typing Indicator */}
+                <TypingStatus
+                    isTyping={isOtherUserTyping}
+                    username={otherUser.username}
+                    avatarUrl={otherUser.avatar_url}
+                />
+
                 <div ref={messagesEndRef} />
             </div>
 
@@ -197,7 +272,7 @@ export function ChatWindow({ conversationId, initialMessages, currentUserId, oth
                 <form onSubmit={handleSend} className="flex gap-2">
                     <Input
                         value={newMessage}
-                        onChange={(e) => setNewMessage(e.target.value)}
+                        onChange={handleInputChange}
                         placeholder="Type a message..."
                         className="flex-1"
                         disabled={isSending}

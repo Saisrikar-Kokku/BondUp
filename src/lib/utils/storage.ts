@@ -34,12 +34,15 @@ export async function uploadFile(
             return { url: null, error: error.message };
         }
 
-        // Get public URL
+        // Get public URL with cache-busting timestamp
         const {
             data: { publicUrl },
         } = client.storage.from(bucket).getPublicUrl(data.path);
 
-        return { url: publicUrl, error: null };
+        // Add timestamp to bust browser cache for updated images
+        const urlWithCacheBuster = `${publicUrl}?t=${Date.now()}`;
+
+        return { url: urlWithCacheBuster, error: null };
     } catch (error) {
         console.error('Upload exception:', error);
         return {

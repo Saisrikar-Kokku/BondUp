@@ -14,15 +14,13 @@ export default async function ExplorePage() {
         redirect('/login');
     }
 
-    // Get user profile
-    const { data: profile } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .single();
+    // Fetch profile and posts in parallel for faster loading
+    const [profileResult, postsResult] = await Promise.all([
+        supabase.from('profiles').select('*').eq('id', user.id).single(),
+        getPublicPosts(20, 0),
+    ]);
 
-    // Get all public posts
-    const postsResult = await getPublicPosts(20, 0);
+    const profile = profileResult.data;
     const initialPosts = (postsResult.success && postsResult.data) ? postsResult.data : [];
 
     return (

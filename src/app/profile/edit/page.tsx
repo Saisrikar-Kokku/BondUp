@@ -96,15 +96,19 @@ function EditProfileContent() {
             });
 
             if (!result.success) {
+                console.error('Profile update failed:', result.error);
                 setError(result.error || 'Failed to update profile');
                 return;
             }
 
             setSuccess('Profile updated successfully!');
+            // Refresh the router cache before navigation
+            router.refresh();
             setTimeout(() => {
                 router.push(`/profile/${formData.username}`);
             }, 1500);
         } catch (err) {
+            console.error('Profile update exception:', err);
             setError('An unexpected error occurred');
         } finally {
             setSaving(false);

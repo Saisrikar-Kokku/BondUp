@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import { Navbar } from '@/components/layout/Navbar';
 import { ConversationList } from '@/components/messages/conversation-list';
 import { getConversations } from '@/lib/actions/messages';
+import { MessagesLayoutContent } from '@/components/messages/layout-content';
 
 export default async function MessagesLayout({
     children,
@@ -40,5 +41,3 @@ export default async function MessagesLayout({
         </div>
     );
 }
-
-import { MessagesLayoutContent } from '@/components/messages/layout-content';

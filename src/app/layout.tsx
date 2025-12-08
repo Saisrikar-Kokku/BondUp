@@ -37,6 +37,8 @@ export const viewport: Viewport = {
     maximumScale: 1,
 };
 
+import { PushNotificationPrompt } from '@/components/ui/push-notification-prompt';
+
 export default function RootLayout({
     children,
 }: Readonly<{
@@ -48,6 +50,9 @@ export default function RootLayout({
                 {/* Preconnect to Supabase for faster API calls */}
                 <link rel="preconnect" href="https://jpzcuudpoepsjawreoic.supabase.co" />
                 <link rel="dns-prefetch" href="https://jpzcuudpoepsjawreoic.supabase.co" />
+                {/* PWA manifest */}
+                <link rel="manifest" href="/manifest.json" />
+                <meta name="theme-color" content="#8B5CF6" />
             </head>
             <body className={`${inter.variable} font-sans antialiased`}>
                 <NotificationProvider>
@@ -55,6 +60,7 @@ export default function RootLayout({
                         <Suspense fallback={null}>
                             <NavigationProgress />
                         </Suspense>
+                        <PushNotificationPrompt />
                         {children}
                     </SessionManager>
                 </NotificationProvider>

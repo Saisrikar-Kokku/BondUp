@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import type { PostWithInteractions } from '@/types/database.types';
 import { formatRelativeTime } from '@/lib/utils/date';
 import { Button } from '@/components/ui/button';
+import { ImageCarousel } from '@/components/ui/image-carousel';
 import { deletePost } from '@/lib/actions/posts';
 import { LikeButton } from './like-button';
 import { CommentSection } from './comment-section';
@@ -125,31 +126,13 @@ export function PostCard({ post, currentUserId, onEdit }: PostCardProps) {
             {/* Content */}
             <p className="mb-4 whitespace-pre-wrap text-gray-900 dark:text-white">{post.content}</p>
 
-            {/* Images */}
+            {/* Images - Modern Carousel */}
             {post.post_attachments && post.post_attachments.length > 0 && (
-                <div
-                    className={`mb-4 grid gap-2 ${post.post_attachments.length === 1
-                            ? 'grid-cols-1'
-                            : post.post_attachments.length === 2
-                                ? 'grid-cols-2'
-                                : post.post_attachments.length === 3
-                                    ? 'grid-cols-3'
-                                    : 'grid-cols-2'
-                        }`}
-                >
-                    {post.post_attachments.map((attachment, index) => (
-                        <img
-                            key={attachment.id}
-                            src={attachment.file_url}
-                            alt={`Attachment ${index + 1}`}
-                            className={`rounded-lg object-cover ${post.post_attachments.length === 1
-                                    ? 'h-96 w-full'
-                                    : post.post_attachments.length === 3 && index === 0
-                                        ? 'col-span-2 h-64'
-                                        : 'h-48 w-full'
-                                }`}
-                        />
-                    ))}
+                <div className="mb-4 -mx-6">
+                    <ImageCarousel
+                        images={post.post_attachments}
+                        className="rounded-none sm:rounded-xl sm:mx-6"
+                    />
                 </div>
             )}
 

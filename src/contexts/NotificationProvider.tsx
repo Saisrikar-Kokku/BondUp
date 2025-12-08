@@ -67,9 +67,10 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
                     filter: `user_id=eq.${userId}`,
                 },
                 (payload) => {
-                    // Add new notification to the list
-                    refreshNotifications();
+                    // Immediately increment count (optimistic)
                     setUnreadCount((prev) => prev + 1);
+                    // Refresh full list in background
+                    refreshNotifications();
                 }
             )
             .on(

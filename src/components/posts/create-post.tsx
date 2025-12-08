@@ -33,15 +33,17 @@ export function CreatePost() {
 
         // Validate each file
         for (const file of files) {
-            const sizeError = validateFileSize(file, 10);
-            if (sizeError) {
-                setError(sizeError);
+            // 6MB limit with clear error message
+            const maxSizeMB = 6;
+            const fileSizeMB = (file.size / (1024 * 1024)).toFixed(1);
+            if (file.size > maxSizeMB * 1024 * 1024) {
+                setError(`Image "${file.name}" is ${fileSizeMB}MB. Maximum allowed is ${maxSizeMB}MB. Please compress or resize the image.`);
                 return;
             }
 
             const typeError = validateFileType(file, ['image/jpeg', 'image/png', 'image/webp']);
             if (typeError) {
-                setError(typeError);
+                setError(`"${file.name}" is not a valid image format. Please use JPG, PNG, or WebP.`);
                 return;
             }
         }

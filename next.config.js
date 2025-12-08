@@ -16,6 +16,9 @@ const nextConfig = {
     // Optimize package imports for faster builds
     experimental: {
         optimizePackageImports: ['lucide-react', 'date-fns'],
+        serverActions: {
+            bodySizeLimit: '8mb', // Allow up to 8MB for image uploads
+        },
     },
 
     images: {

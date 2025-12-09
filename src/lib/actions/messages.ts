@@ -384,14 +384,19 @@ export async function deleteMessage(messageId: string) {
         // First, get the message to check for attached files
         const { data: message, error: fetchError } = await supabase
             .from('messages')
-            .select('image_url, audio_url, sender_id')
+            .select('image_url, audio_url, sender_id, conversation_id')
             .eq('id', messageId)
             .eq('sender_id', user.id) // Ensure user owns the message
             .single();
 
         if (fetchError || !message) {
+            console.log('[DeleteMessage] Message not found or unauthorized:', fetchError);
             return { success: false, error: 'Message not found or not authorized' };
         }
+
+        console.log('[DeleteMessage] Deleting message:', messageId);
+        console.log('[DeleteMessage] Image URL:', message.image_url);
+        console.log('[DeleteMessage] Audio URL:', message.audio_url);
 
         // Delete image from storage if present
         if (message.image_url) {
@@ -400,12 +405,19 @@ export async function deleteMessage(messageId: string) {
                 // URL format: https://xxx.supabase.co/storage/v1/object/public/message-images/userId/conversationId/filename
                 const urlParts = message.image_url.split('/message-images/');
                 if (urlParts.length > 1) {
-                    const filePath = urlParts[1];
-                    await supabase.storage.from('message-images').remove([filePath]);
+                    const filePath = decodeURIComponent(urlParts[1]);
+                    console.log('[DeleteMessage] Deleting image:', filePath);
+                    const { error: deleteError } = await supabase.storage
+                        .from('message-images')
+                        .remove([filePath]);
+                    if (deleteError) {
+                        console.error('[DeleteMessage] Image delete error:', deleteError);
+                    } else {
+                        console.log('[DeleteMessage] Image deleted successfully');
+                    }
                 }
             } catch (storageError) {
-                console.error('Error deleting image from storage:', storageError);
-                // Continue with message deletion even if storage deletion fails
+                console.error('[DeleteMessage] Error deleting image from storage:', storageError);
             }
         }
 
@@ -416,12 +428,19 @@ export async function deleteMessage(messageId: string) {
                 // URL format: https://xxx.supabase.co/storage/v1/object/public/message-audio/userId/conversationId/filename
                 const urlParts = message.audio_url.split('/message-audio/');
                 if (urlParts.length > 1) {
-                    const filePath = urlParts[1];
-                    await supabase.storage.from('message-audio').remove([filePath]);
+                    const filePath = decodeURIComponent(urlParts[1]);
+                    console.log('[DeleteMessage] Deleting audio:', filePath);
+                    const { error: deleteError } = await supabase.storage
+                        .from('message-audio')
+                        .remove([filePath]);
+                    if (deleteError) {
+                        console.error('[DeleteMessage] Audio delete error:', deleteError);
+                    } else {
+                        console.log('[DeleteMessage] Audio deleted successfully');
+                    }
                 }
             } catch (storageError) {
-                console.error('Error deleting audio from storage:', storageError);
-                // Continue with message deletion even if storage deletion fails
+                console.error('[DeleteMessage] Error deleting audio from storage:', storageError);
             }
         }
 
@@ -432,11 +451,17 @@ export async function deleteMessage(messageId: string) {
             .eq('id', messageId)
             .eq('sender_id', user.id);
 
-        if (error) return { success: false, error: error.message };
+        if (error) {
+            console.error('[DeleteMessage] Database delete error:', error);
+            return { success: false, error: error.message };
+        }
 
+        console.log('[DeleteMessage] Message deleted successfully');
         revalidatePath('/messages');
+        revalidatePath(`/messages/${message.conversation_id}`);
         return { success: true };
     } catch (error) {
+        console.error('[DeleteMessage] Exception:', error);
         return { success: false, error: 'Failed to delete message' };
     }
 }

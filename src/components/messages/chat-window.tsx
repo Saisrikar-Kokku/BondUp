@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import { sendMessage, markConversationAsRead } from '@/lib/actions/messages';
+import { sendMessage, markConversationAsRead, getMessages } from '@/lib/actions/messages';
 import { MessageBubble } from './message-bubble';
 import { TypingStatus } from './typing-indicator';
 import { Button } from '@/components/ui/button';
@@ -11,6 +11,13 @@ import { Send, ArrowLeft, X, Reply, ImagePlus, Mic } from 'lucide-react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { VoiceRecorder } from './voice-recorder';
+
+interface Reaction {
+    id: string;
+    emoji: string;
+    user_id: string;
+    profiles?: { username: string };
+}
 
 interface Message {
     id: string;
@@ -26,6 +33,7 @@ interface Message {
         content: string;
         sender_id: string;
     };
+    reactions?: Reaction[];
 }
 
 interface ChatWindowProps {
@@ -78,6 +86,14 @@ export function ChatWindow({ conversationId, initialMessages, currentUserId, oth
     const cancelReply = useCallback(() => {
         setReplyingTo(null);
     }, []);
+
+    // Handle reaction update - refetch messages to get updated reactions
+    const handleReactionUpdate = useCallback(async () => {
+        const result = await getMessages(conversationId);
+        if (result.success && result.data) {
+            setMessages(result.data);
+        }
+    }, [conversationId]);
 
     // Handle image selection
     const handleImageSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
@@ -177,6 +193,9 @@ export function ChatWindow({ conversationId, initialMessages, currentUserId, oth
                 },
                 (payload) => {
                     const newMsg = payload.new as Message;
+                    // Initialize reactions array for new messages
+                    newMsg.reactions = newMsg.reactions || [];
+
                     setMessages((prev) => {
                         if (prev.some(m => m.id === newMsg.id)) {
                             return prev;
@@ -246,9 +265,34 @@ export function ChatWindow({ conversationId, initialMessages, currentUserId, oth
             })
             .subscribe();
 
+        // Subscribe to reactions - refetch messages when reactions change
+        const reactionsChannel = supabase
+            .channel(`reactions:${conversationId}`)
+            .on(
+                'postgres_changes',
+                {
+                    event: '*',
+                    schema: 'public',
+                    table: 'message_reactions',
+                },
+                async (payload) => {
+                    // Get the message_id from the reaction
+                    const messageId = (payload.new as any)?.message_id || (payload.old as any)?.message_id;
+                    if (!messageId) return;
+
+                    // Refetch all messages to get updated reactions
+                    const result = await getMessages(conversationId);
+                    if (result.success && result.data) {
+                        setMessages(result.data);
+                    }
+                }
+            )
+            .subscribe();
+
         return () => {
             supabase.removeChannel(messagesChannel);
             supabase.removeChannel(typingChannel);
+            supabase.removeChannel(reactionsChannel);
             if (typingTimeoutRef.current) {
                 clearTimeout(typingTimeoutRef.current);
             }
@@ -392,6 +436,8 @@ export function ChatWindow({ conversationId, initialMessages, currentUserId, oth
                             onDelete={(id) => setMessages(prev => prev.filter(m => m.id !== id))}
                             onReply={handleReply}
                             otherUsername={otherUser.username}
+                            currentUserId={currentUserId}
+                            onReactionUpdate={handleReactionUpdate}
                         />
                     );
                 })}

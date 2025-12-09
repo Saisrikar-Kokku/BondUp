@@ -4,8 +4,18 @@ import React, { useState, useRef, useCallback } from 'react';
 import { format, formatDistanceToNow } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { deleteMessage } from '@/lib/actions/messages';
+import { addReaction, removeReaction } from '@/lib/actions/reactions';
 import { Trash2, CornerDownRight, X, MessageCircle } from 'lucide-react';
 import { AudioPlayer } from './audio-player';
+import { ReactionPicker } from './reaction-picker';
+import { ReactionDisplay } from './reaction-display';
+
+interface Reaction {
+    id: string;
+    emoji: string;
+    user_id: string;
+    profiles?: { username: string };
+}
 
 interface Message {
     id: string;
@@ -21,6 +31,7 @@ interface Message {
         content: string;
         sender_id: string;
     };
+    reactions?: Reaction[];
 }
 
 interface MessageBubbleProps {
@@ -31,6 +42,8 @@ interface MessageBubbleProps {
     onDelete?: (id: string) => void;
     onReply?: (message: Message) => void;
     otherUsername?: string;
+    currentUserId: string;
+    onReactionUpdate?: (messageId: string) => void;
 }
 
 const SWIPE_THRESHOLD = 60;
@@ -42,23 +55,57 @@ export function MessageBubble({
     readAt,
     onDelete,
     onReply,
-    otherUsername = 'User'
+    otherUsername = 'User',
+    currentUserId,
+    onReactionUpdate
 }: MessageBubbleProps) {
     const [showMenu, setShowMenu] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
     const [translateX, setTranslateX] = useState(0);
     const [isDragging, setIsDragging] = useState(false);
     const [showFullscreenImage, setShowFullscreenImage] = useState(false);
+    const [showReactionPicker, setShowReactionPicker] = useState(false);
 
     const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
     const startXRef = useRef(0);
     const isDraggingRef = useRef(false);
+    const lastTapRef = useRef<number>(0);
     const translateXRef = useRef(0);
 
     const handleLongPress = useCallback(() => {
         setShowMenu(true);
         if (navigator.vibrate) navigator.vibrate(50);
     }, []);
+
+    // Double-tap detection for reactions
+    const handleDoubleTap = useCallback(() => {
+        const now = Date.now();
+        const DOUBLE_TAP_DELAY = 300;
+
+        if (now - lastTapRef.current < DOUBLE_TAP_DELAY) {
+            // Double tap detected!
+            setShowReactionPicker(true);
+            if (navigator.vibrate) navigator.vibrate(25);
+            lastTapRef.current = 0; // Reset
+        } else {
+            lastTapRef.current = now;
+        }
+    }, []);
+
+    // Handle reaction selection
+    const handleReaction = useCallback(async (emoji: string) => {
+        if (emoji === '') {
+            // Remove reaction
+            await removeReaction(message.id);
+        } else {
+            // Add reaction
+            await addReaction(message.id, emoji);
+        }
+        onReactionUpdate?.(message.id);
+    }, [message.id, onReactionUpdate]);
+
+    // Get current user's reaction on this message
+    const currentUserReaction = message.reactions?.find(r => r.user_id === currentUserId)?.emoji;
 
     const handleDownloadImage = useCallback(async () => {
         if (!message.image_url) return;
@@ -256,13 +303,35 @@ export function MessageBubble({
                     )}
 
                     {/* Main Message Bubble - Modern with subtle glow */}
-                    <div className={cn(
-                        "relative rounded-2xl px-3 py-2 shadow-sm",
-                        isOwn
-                            ? "bg-gradient-to-br from-primary-500 via-primary-500 to-primary-600 text-white shadow-primary-500/20"
-                            : "bg-white dark:bg-gray-800 text-gray-900 dark:text-white border border-gray-100 dark:border-gray-700 shadow-gray-200/50 dark:shadow-gray-900/50",
-                        isOwn ? "rounded-br-sm" : "rounded-bl-sm"
-                    )}>
+                    <div
+                        onClick={handleDoubleTap}
+                        className={cn(
+                            "relative rounded-2xl px-3 py-2 mb-4 shadow-sm cursor-pointer select-none overflow-visible",
+                            isOwn
+                                ? "bg-gradient-to-br from-primary-500 via-primary-500 to-primary-600 text-white shadow-primary-500/20"
+                                : "bg-white dark:bg-gray-800 text-gray-900 dark:text-white border border-gray-100 dark:border-gray-700 shadow-gray-200/50 dark:shadow-gray-900/50",
+                            isOwn ? "rounded-br-sm" : "rounded-bl-sm"
+                        )}
+                    >
+                        {/* Reaction Picker */}
+                        <ReactionPicker
+                            messageId={message.id}
+                            isVisible={showReactionPicker}
+                            onClose={() => setShowReactionPicker(false)}
+                            onReact={handleReaction}
+                            position={isOwn ? 'right' : 'left'}
+                            currentReaction={currentUserReaction}
+                        />
+
+                        {/* Reaction Display */}
+                        {message.reactions && message.reactions.length > 0 && (
+                            <ReactionDisplay
+                                reactions={message.reactions}
+                                isOwn={isOwn}
+                                currentUserId={currentUserId}
+                                onReactionClick={() => setShowReactionPicker(true)}
+                            />
+                        )}
                         {/* Subtle shine effect for own messages */}
                         {isOwn && (
                             <div className="absolute inset-0 rounded-2xl rounded-br-sm overflow-hidden pointer-events-none">

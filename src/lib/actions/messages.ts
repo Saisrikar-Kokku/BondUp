@@ -81,16 +81,46 @@ export async function getMessages(conversationId: string) {
 
         if (!user) return { success: false, error: 'Not authenticated' };
 
-        const { data, error } = await supabase
+        // Get messages first
+        const { data: messagesData, error: messagesError } = await supabase
             .from('messages')
             .select('*')
             .eq('conversation_id', conversationId)
             .order('created_at', { ascending: true });
 
-        if (error) return { success: false, error: error.message };
+        if (messagesError) return { success: false, error: messagesError.message };
 
-        return { success: true, data };
+        // Get reactions for these messages
+        const messageIds = messagesData?.map(m => m.id) || [];
+
+        let reactionsMap: Record<string, any[]> = {};
+
+        if (messageIds.length > 0) {
+            const { data: reactionsData } = await supabase
+                .from('message_reactions')
+                .select('id, message_id, emoji, user_id')
+                .in('message_id', messageIds);
+
+            // Group reactions by message_id
+            if (reactionsData) {
+                reactionsData.forEach(r => {
+                    if (!reactionsMap[r.message_id]) {
+                        reactionsMap[r.message_id] = [];
+                    }
+                    reactionsMap[r.message_id].push(r);
+                });
+            }
+        }
+
+        // Attach reactions to messages
+        const messagesWithReactions = messagesData?.map(msg => ({
+            ...msg,
+            reactions: reactionsMap[msg.id] || []
+        })) || [];
+
+        return { success: true, data: messagesWithReactions };
     } catch (error) {
+        console.error('[getMessages] Error:', error);
         return { success: false, error: 'Failed to fetch messages' };
     }
 }
@@ -390,57 +420,32 @@ export async function deleteMessage(messageId: string) {
             .single();
 
         if (fetchError || !message) {
-            console.log('[DeleteMessage] Message not found or unauthorized:', fetchError);
             return { success: false, error: 'Message not found or not authorized' };
         }
-
-        console.log('[DeleteMessage] Deleting message:', messageId);
-        console.log('[DeleteMessage] Image URL:', message.image_url);
-        console.log('[DeleteMessage] Audio URL:', message.audio_url);
 
         // Delete image from storage if present
         if (message.image_url) {
             try {
-                // Extract file path from URL
-                // URL format: https://xxx.supabase.co/storage/v1/object/public/message-images/userId/conversationId/filename
                 const urlParts = message.image_url.split('/message-images/');
                 if (urlParts.length > 1) {
                     const filePath = decodeURIComponent(urlParts[1]);
-                    console.log('[DeleteMessage] Deleting image:', filePath);
-                    const { error: deleteError } = await supabase.storage
-                        .from('message-images')
-                        .remove([filePath]);
-                    if (deleteError) {
-                        console.error('[DeleteMessage] Image delete error:', deleteError);
-                    } else {
-                        console.log('[DeleteMessage] Image deleted successfully');
-                    }
+                    await supabase.storage.from('message-images').remove([filePath]);
                 }
             } catch (storageError) {
-                console.error('[DeleteMessage] Error deleting image from storage:', storageError);
+                console.error('[DeleteMessage] Error deleting image:', storageError);
             }
         }
 
         // Delete audio from storage if present
         if (message.audio_url) {
             try {
-                // Extract file path from URL
-                // URL format: https://xxx.supabase.co/storage/v1/object/public/message-audio/userId/conversationId/filename
                 const urlParts = message.audio_url.split('/message-audio/');
                 if (urlParts.length > 1) {
                     const filePath = decodeURIComponent(urlParts[1]);
-                    console.log('[DeleteMessage] Deleting audio:', filePath);
-                    const { error: deleteError } = await supabase.storage
-                        .from('message-audio')
-                        .remove([filePath]);
-                    if (deleteError) {
-                        console.error('[DeleteMessage] Audio delete error:', deleteError);
-                    } else {
-                        console.log('[DeleteMessage] Audio deleted successfully');
-                    }
+                    await supabase.storage.from('message-audio').remove([filePath]);
                 }
             } catch (storageError) {
-                console.error('[DeleteMessage] Error deleting audio from storage:', storageError);
+                console.error('[DeleteMessage] Error deleting audio:', storageError);
             }
         }
 
@@ -452,11 +457,10 @@ export async function deleteMessage(messageId: string) {
             .eq('sender_id', user.id);
 
         if (error) {
-            console.error('[DeleteMessage] Database delete error:', error);
+            console.error('[DeleteMessage] Database error:', error);
             return { success: false, error: error.message };
         }
 
-        console.log('[DeleteMessage] Message deleted successfully');
         revalidatePath('/messages');
         revalidatePath(`/messages/${message.conversation_id}`);
         return { success: true };

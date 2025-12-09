@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { sendTestNotification, getSubscriptionStatus } from '@/lib/actions/push-notifications';
+import { useState, useEffect } from 'react';
+import { sendTestNotification, getSubscriptionStatus, saveSubscription, getVapidPublicKey } from '@/lib/actions/push-notifications';
 
 interface DebugStatus {
     success: boolean;
@@ -19,7 +19,18 @@ interface DebugStatus {
 export function PushDebugPanel({ initialStatus }: { initialStatus: DebugStatus }) {
     const [status, setStatus] = useState<DebugStatus>(initialStatus);
     const [testResult, setTestResult] = useState<any>(null);
+    const [subscribeResult, setSubscribeResult] = useState<any>(null);
     const [loading, setLoading] = useState(false);
+    const [deviceInfo, setDeviceInfo] = useState<string>('');
+
+    useEffect(() => {
+        // Detect device type
+        const ua = navigator.userAgent;
+        if (/Android/i.test(ua)) setDeviceInfo('Android');
+        else if (/iPhone|iPad|iPod/i.test(ua)) setDeviceInfo('iOS');
+        else if (/Windows/i.test(ua)) setDeviceInfo('Windows');
+        else setDeviceInfo('Unknown');
+    }, []);
 
     const refreshStatus = async () => {
         setLoading(true);
@@ -33,6 +44,100 @@ export function PushDebugPanel({ initialStatus }: { initialStatus: DebugStatus }
         setTestResult(null);
         const result = await sendTestNotification();
         setTestResult(result);
+        setLoading(false);
+    };
+
+    // Helper to convert base64url
+    const urlBase64ToUint8Array = (base64String: string) => {
+        const padding = '='.repeat((4 - base64String.length % 4) % 4);
+        const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+        const rawData = window.atob(base64);
+        const outputArray = new Uint8Array(rawData.length);
+        for (let i = 0; i < rawData.length; ++i) {
+            outputArray[i] = rawData.charCodeAt(i);
+        }
+        return outputArray;
+    };
+
+    const arrayBufferToBase64Url = (buffer: ArrayBuffer) => {
+        const bytes = new Uint8Array(buffer);
+        let binary = '';
+        for (let i = 0; i < bytes.byteLength; i++) {
+            binary += String.fromCharCode(bytes[i]);
+        }
+        return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    };
+
+    const subscribeThisDevice = async () => {
+        setLoading(true);
+        setSubscribeResult(null);
+
+        try {
+            // Check if service workers and push are supported
+            if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+                setSubscribeResult({ success: false, error: 'Push notifications not supported on this device' });
+                setLoading(false);
+                return;
+            }
+
+            // Get VAPID key
+            const vapidKey = await getVapidPublicKey();
+            if (!vapidKey) {
+                setSubscribeResult({ success: false, error: 'VAPID key not available' });
+                setLoading(false);
+                return;
+            }
+
+            // Request notification permission
+            const permission = await Notification.requestPermission();
+            if (permission !== 'granted') {
+                setSubscribeResult({ success: false, error: `Notification permission: ${permission}` });
+                setLoading(false);
+                return;
+            }
+
+            // Register service worker
+            const registration = await navigator.serviceWorker.register('/sw.js');
+            await navigator.serviceWorker.ready;
+
+            // Check if already subscribed
+            let subscription = await registration.pushManager.getSubscription();
+
+            // If already subscribed, unsubscribe first to get a fresh subscription
+            if (subscription) {
+                await subscription.unsubscribe();
+            }
+
+            // Subscribe to push
+            subscription = await registration.pushManager.subscribe({
+                userVisibleOnly: true,
+                applicationServerKey: urlBase64ToUint8Array(vapidKey)
+            });
+
+            // Save to database
+            const result = await saveSubscription({
+                endpoint: subscription.endpoint,
+                keys: {
+                    p256dh: arrayBufferToBase64Url(subscription.getKey('p256dh')!),
+                    auth: arrayBufferToBase64Url(subscription.getKey('auth')!)
+                }
+            });
+
+            if (result.success) {
+                setSubscribeResult({
+                    success: true,
+                    message: 'Device subscribed successfully!',
+                    endpoint: subscription.endpoint.substring(0, 60) + '...'
+                });
+                // Refresh status
+                await refreshStatus();
+            } else {
+                setSubscribeResult({ success: false, error: result.error });
+            }
+        } catch (error: any) {
+            setSubscribeResult({ success: false, error: error.message });
+        }
+
         setLoading(false);
     };
 
@@ -88,6 +193,38 @@ export function PushDebugPanel({ initialStatus }: { initialStatus: DebugStatus }
                 >
                     {loading ? 'Loading...' : 'Refresh Status'}
                 </button>
+            </div>
+
+            {/* Subscribe This Device Card */}
+            <div className="bg-orange-50 dark:bg-orange-900/20 rounded-xl p-6 shadow-sm border-2 border-orange-200 dark:border-orange-800">
+                <h2 className="text-lg font-semibold text-orange-900 dark:text-orange-300 mb-2">
+                    📱 Subscribe This Device
+                </h2>
+                <p className="text-sm text-orange-800 dark:text-orange-400 mb-4">
+                    Device detected: <strong>{deviceInfo}</strong>
+                    <br />
+                    Click below to register THIS device for push notifications.
+                    Each device needs to be subscribed separately.
+                </p>
+
+                <button
+                    onClick={subscribeThisDevice}
+                    disabled={loading || !status.vapidConfigured}
+                    className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+                >
+                    {loading ? 'Subscribing...' : 'Subscribe This Device'}
+                </button>
+
+                {subscribeResult && (
+                    <div className={`mt-4 p-4 rounded-lg ${subscribeResult.success ? 'bg-green-50 dark:bg-green-900/20' : 'bg-red-50 dark:bg-red-900/20'}`}>
+                        <h3 className={`font-semibold ${subscribeResult.success ? 'text-green-700 dark:text-green-400' : 'text-red-700 dark:text-red-400'}`}>
+                            {subscribeResult.success ? '✓ Subscribed!' : '✗ Failed'}
+                        </h3>
+                        <pre className="mt-2 text-xs font-mono overflow-auto max-h-40">
+                            {JSON.stringify(subscribeResult, null, 2)}
+                        </pre>
+                    </div>
+                )}
             </div>
 
             {/* Test Card */}

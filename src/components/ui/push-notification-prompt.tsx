@@ -14,6 +14,8 @@ export function PushNotificationPrompt() {
 
     useEffect(() => {
         // Check if push notifications are supported
+        if (typeof window === 'undefined') return;
+
         if (!('Notification' in window) || !('serviceWorker' in navigator) || !('PushManager' in window)) {
             setPermission('unsupported');
             return;
@@ -24,7 +26,7 @@ export function PushNotificationPrompt() {
         // Get VAPID key
         getVapidPublicKey().then(key => setVapidKey(key));
 
-        // Check if already subscribed
+        // Check if already subscribed (with timeout to not block)
         checkSubscription();
 
         // Show prompt after a delay if not subscribed and permission not denied
@@ -32,18 +34,36 @@ export function PushNotificationPrompt() {
             if (Notification.permission === 'default') {
                 setShowPrompt(true);
             }
-        }, 5000);
+        }, 3000); // Reduced to 3 seconds
 
         return () => clearTimeout(timer);
     }, []);
 
     const checkSubscription = async () => {
         try {
-            const registration = await navigator.serviceWorker.ready;
-            const subscription = await registration.pushManager.getSubscription();
+            // Check if service worker is already registered
+            const registrations = await navigator.serviceWorker.getRegistrations();
+            if (registrations.length === 0) {
+                // No service worker registered yet, user is not subscribed
+                setIsSubscribed(false);
+                return;
+            }
+
+            // Try to get subscription with a timeout
+            const timeoutPromise = new Promise<null>((_, reject) =>
+                setTimeout(() => reject(new Error('Timeout')), 2000)
+            );
+
+            const subscriptionPromise = (async () => {
+                const registration = await navigator.serviceWorker.ready;
+                return registration.pushManager.getSubscription();
+            })();
+
+            const subscription = await Promise.race([subscriptionPromise, timeoutPromise]);
             setIsSubscribed(!!subscription);
         } catch (error) {
-            console.error('Error checking subscription:', error);
+            // If timeout or error, assume not subscribed
+            setIsSubscribed(false);
         }
     };
 

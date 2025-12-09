@@ -62,6 +62,20 @@ export function PushNotificationPrompt() {
         return outputArray;
     };
 
+    // Convert ArrayBuffer to base64url string (required by web-push)
+    const arrayBufferToBase64Url = (buffer: ArrayBuffer) => {
+        const bytes = new Uint8Array(buffer);
+        let binary = '';
+        for (let i = 0; i < bytes.byteLength; i++) {
+            binary += String.fromCharCode(bytes[i]);
+        }
+        // Convert to base64, then to base64url
+        return btoa(binary)
+            .replace(/\+/g, '-')
+            .replace(/\//g, '_')
+            .replace(/=+$/, '');
+    };
+
     const subscribe = async () => {
         if (!vapidKey) {
             console.error('VAPID key not available');
@@ -95,8 +109,8 @@ export function PushNotificationPrompt() {
             const result = await saveSubscription({
                 endpoint: subscription.endpoint,
                 keys: {
-                    p256dh: btoa(String.fromCharCode(...new Uint8Array(subscription.getKey('p256dh')!))),
-                    auth: btoa(String.fromCharCode(...new Uint8Array(subscription.getKey('auth')!)))
+                    p256dh: arrayBufferToBase64Url(subscription.getKey('p256dh')!),
+                    auth: arrayBufferToBase64Url(subscription.getKey('auth')!)
                 }
             });
 
@@ -223,6 +237,19 @@ export function NotificationToggle() {
         return outputArray;
     };
 
+    // Convert ArrayBuffer to base64url string (required by web-push)
+    const arrayBufferToBase64Url = (buffer: ArrayBuffer) => {
+        const bytes = new Uint8Array(buffer);
+        let binary = '';
+        for (let i = 0; i < bytes.byteLength; i++) {
+            binary += String.fromCharCode(bytes[i]);
+        }
+        return btoa(binary)
+            .replace(/\+/g, '-')
+            .replace(/\//g, '_')
+            .replace(/=+$/, '');
+    };
+
     const toggle = async () => {
         if (!vapidKey) {
             console.error('VAPID key missing');
@@ -255,8 +282,8 @@ export function NotificationToggle() {
                     await saveSubscription({
                         endpoint: subscription.endpoint,
                         keys: {
-                            p256dh: btoa(String.fromCharCode(...new Uint8Array(subscription.getKey('p256dh')!))),
-                            auth: btoa(String.fromCharCode(...new Uint8Array(subscription.getKey('auth')!)))
+                            p256dh: arrayBufferToBase64Url(subscription.getKey('p256dh')!),
+                            auth: arrayBufferToBase64Url(subscription.getKey('auth')!)
                         }
                     });
                     setIsSubscribed(true);

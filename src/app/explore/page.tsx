@@ -24,14 +24,20 @@ export default async function ExplorePage() {
     const initialPosts = (postsResult.success && postsResult.data) ? postsResult.data : [];
 
     return (
-        <div className="min-h-screen bg-gray-50 dark:bg-gray-900 pb-20 md:pb-0">
+        <div className="min-h-screen bg-gradient-to-b from-gray-50 via-gray-50 to-gray-100 dark:from-gray-900 dark:via-gray-900 dark:to-gray-950 pb-20 md:pb-0">
             <Navbar user={profile || { id: user.id, username: 'user' }} />
 
             {/* Main Content */}
             <main className="mx-auto max-w-2xl px-4 py-8 sm:px-6 lg:px-8">
+                {/* Header - Minimal */}
                 <div className="mb-8">
-                    <h2 className="mb-2 text-3xl font-bold text-gray-900 dark:text-white">Explore</h2>
-                    <p className="text-gray-600 dark:text-gray-400">
+                    <div className="flex items-center gap-3 mb-2">
+                        <h2 className="text-3xl font-bold bg-gradient-to-r from-gray-900 via-gray-700 to-gray-900 dark:from-white dark:via-gray-200 dark:to-white bg-clip-text text-transparent">
+                            Explore
+                        </h2>
+                        <div className="flex-1 h-px bg-gradient-to-r from-gray-300 via-gray-200 to-transparent dark:from-gray-700 dark:via-gray-800" />
+                    </div>
+                    <p className="text-gray-500 dark:text-gray-400 text-sm">
                         Discover public posts from everyone on BondUp
                     </p>
                 </div>
@@ -40,13 +46,13 @@ export default async function ExplorePage() {
                 {initialPosts.length > 0 ? (
                     <PostFeed initialPosts={initialPosts} currentUserId={user.id} feedType="public" />
                 ) : (
-                    <div className="rounded-2xl border border-gray-200 bg-white p-12 text-center shadow-sm dark:border-gray-700 dark:bg-gray-800">
+                    <div className="rounded-2xl glass-light p-12 text-center shadow-lg">
                         <div className="mx-auto max-w-md">
-                            <div className="mb-4 text-6xl">🌍</div>
-                            <h3 className="mb-2 text-xl font-semibold text-gray-900 dark:text-white">
+                            <div className="mb-4 text-5xl opacity-80">🌍</div>
+                            <h3 className="mb-2 text-lg font-medium text-gray-700 dark:text-gray-300">
                                 No public posts yet
                             </h3>
-                            <p className="text-gray-600 dark:text-gray-400">
+                            <p className="text-gray-500 dark:text-gray-400 text-sm">
                                 Be the first to share something with the world!
                             </p>
                         </div>

@@ -69,8 +69,40 @@ export function ChatWindow({ conversationId, initialMessages, currentUserId, oth
         scrollToBottom();
     }, [messages, isOtherUserTyping]);
 
+    // Mark messages as read on mount and when window gains focus
     useEffect(() => {
         markConversationAsRead(conversationId);
+
+        // Also mark as read when window gains focus
+        const handleVisibilityChange = () => {
+            if (document.visibilityState === 'visible') {
+                markConversationAsRead(conversationId);
+                // Refetch messages to get updated read statuses
+                getMessages(conversationId).then(result => {
+                    if (result.success && result.data) {
+                        setMessages(result.data);
+                    }
+                });
+            }
+        };
+
+        const handleFocus = () => {
+            markConversationAsRead(conversationId);
+            // Refetch to update seen status from sender side
+            getMessages(conversationId).then(result => {
+                if (result.success && result.data) {
+                    setMessages(result.data);
+                }
+            });
+        };
+
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+        window.addEventListener('focus', handleFocus);
+
+        return () => {
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+            window.removeEventListener('focus', handleFocus);
+        };
     }, [conversationId]);
 
     // Handle reply selection
@@ -383,11 +415,14 @@ export function ChatWindow({ conversationId, initialMessages, currentUserId, oth
     });
 
     return (
-        <div className="flex flex-col h-full max-h-full bg-gray-50 dark:bg-gray-900 overflow-hidden">
-            {/* Header - fixed height */}
-            <div className="p-3 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 flex items-center gap-3 flex-shrink-0">
-                <Link href="/messages" className="md:hidden text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
-                    <ArrowLeft className="h-6 w-6" />
+        <div className="flex flex-col h-[100dvh] md:h-full bg-gray-50 dark:bg-gray-900">
+            {/* Header - fixed at top */}
+            <div className="flex-shrink-0 p-3 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 flex items-center gap-3 shadow-sm">
+                <Link
+                    href="/messages"
+                    className="p-2 -ml-2 rounded-lg text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:bg-gray-700 transition-colors"
+                >
+                    <ArrowLeft className="h-5 w-5" />
                 </Link>
                 <Link
                     href={`/profile/${otherUser.username}`}
@@ -452,159 +487,161 @@ export function ChatWindow({ conversationId, initialMessages, currentUserId, oth
                 <div ref={messagesEndRef} />
             </div>
 
-            {/* Reply Preview - strictly single line, max 50 chars */}
-            {replyingTo && (
-                <div className="bg-primary-50/50 dark:bg-gray-800/50 border-t border-primary-100 dark:border-primary-900/50 flex-shrink-0 h-10 flex items-center px-3 gap-2 overflow-hidden">
-                    <div className="w-0.5 h-5 rounded-full bg-primary-500 flex-shrink-0" />
-                    <Reply className="h-3 w-3 text-primary-500 flex-shrink-0" />
-                    <span className="text-xs text-primary-600 dark:text-primary-400 font-medium flex-shrink-0 whitespace-nowrap">
-                        {replyingTo.sender_id === currentUserId ? 'You' : otherUser.username}:
-                    </span>
-                    <span className="text-xs text-gray-500 dark:text-gray-400 truncate flex-1 min-w-0">
-                        {replyingTo.content.length > 40 ? replyingTo.content.slice(0, 40) + '...' : replyingTo.content}
-                    </span>
-                    <button
-                        onClick={cancelReply}
-                        className="p-1.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700 flex-shrink-0"
-                    >
-                        <X className="h-3.5 w-3.5 text-gray-400" />
-                    </button>
-                </div>
-            )}
-            {/* Image Preview */}
-            {imagePreview && (
-                <div className="px-4 py-2 bg-gray-50 dark:bg-gray-800/50 border-b border-gray-200/50 dark:border-gray-700/50">
-                    <div className="relative inline-block">
-                        <img
-                            src={imagePreview}
-                            alt="Preview"
-                            className="h-20 w-auto rounded-lg object-cover shadow-md"
-                        />
+            {/* Bottom area - Reply Preview & Input Form */}
+            <div className="flex-shrink-0 bg-white dark:bg-gray-800">
+                {/* Reply Preview - strictly single line, max 50 chars */}
+                {replyingTo && (
+                    <div className="bg-primary-50/50 dark:bg-gray-800/50 border-t border-primary-100 dark:border-primary-900/50 flex-shrink-0 h-10 flex items-center px-3 gap-2 overflow-hidden">
+                        <div className="w-0.5 h-5 rounded-full bg-primary-500 flex-shrink-0" />
+                        <Reply className="h-3 w-3 text-primary-500 flex-shrink-0" />
+                        <span className="text-xs text-primary-600 dark:text-primary-400 font-medium flex-shrink-0 whitespace-nowrap">
+                            {replyingTo.sender_id === currentUserId ? 'You' : otherUser.username}:
+                        </span>
+                        <span className="text-xs text-gray-500 dark:text-gray-400 truncate flex-1 min-w-0">
+                            {replyingTo.content.length > 40 ? replyingTo.content.slice(0, 40) + '...' : replyingTo.content}
+                        </span>
                         <button
-                            onClick={clearImage}
-                            className="absolute -top-1.5 -right-1.5 p-1 rounded-full bg-gray-800 dark:bg-gray-600 text-white hover:bg-gray-700 dark:hover:bg-gray-500 transition-colors shadow-lg"
+                            onClick={cancelReply}
+                            className="p-1.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700 flex-shrink-0"
                         >
-                            <X className="h-3 w-3" />
+                            <X className="h-3.5 w-3.5 text-gray-400" />
                         </button>
                     </div>
-                </div>
-            )}
+                )}
+                {/* Image Preview */}
+                {imagePreview && (
+                    <div className="px-4 py-2 bg-gray-50 dark:bg-gray-800/50 border-b border-gray-200/50 dark:border-gray-700/50">
+                        <div className="relative inline-block">
+                            <img
+                                src={imagePreview}
+                                alt="Preview"
+                                className="h-20 w-auto rounded-lg object-cover shadow-md"
+                            />
+                            <button
+                                onClick={clearImage}
+                                className="absolute -top-1.5 -right-1.5 p-1 rounded-full bg-gray-800 dark:bg-gray-600 text-white hover:bg-gray-700 dark:hover:bg-gray-500 transition-colors shadow-lg"
+                            >
+                                <X className="h-3 w-3" />
+                            </button>
+                        </div>
+                    </div>
+                )}
 
-            {/* Image Error */}
-            {imageError && (
-                <div className="px-4 py-2 bg-red-50 dark:bg-red-900/20 border-b border-red-200 dark:border-red-800">
-                    <p className="text-xs text-red-600 dark:text-red-400">{imageError}</p>
-                </div>
-            )}
+                {/* Image Error */}
+                {imageError && (
+                    <div className="px-4 py-2 bg-red-50 dark:bg-red-900/20 border-b border-red-200 dark:border-red-800">
+                        <p className="text-xs text-red-600 dark:text-red-400">{imageError}</p>
+                    </div>
+                )}
 
-            {/* Modern Premium Input */}
-            <div className="p-3 bg-gradient-to-t from-white via-white to-gray-50/80 dark:from-gray-800 dark:via-gray-800 dark:to-gray-900/80 border-t border-gray-200/50 dark:border-gray-700/50 flex-shrink-0">
-                {/* Hidden file input */}
-                <input
-                    ref={imageInputRef}
-                    type="file"
-                    accept="image/jpeg,image/png,image/webp"
-                    onChange={handleImageSelect}
-                    className="hidden"
-                />
+                {/* Modern Premium Input */}
+                <div className="p-3 bg-gradient-to-t from-white via-white to-gray-50/80 dark:from-gray-800 dark:via-gray-800 dark:to-gray-900/80 border-t border-gray-200/50 dark:border-gray-700/50 flex-shrink-0">
+                    {/* Hidden file input */}
+                    <input
+                        ref={imageInputRef}
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp"
+                        onChange={handleImageSelect}
+                        className="hidden"
+                    />
 
-                <form onSubmit={handleSend} className="flex items-center gap-2">
-                    {/* Image Picker Button */}
-                    <button
-                        type="button"
-                        onClick={() => imageInputRef.current?.click()}
-                        disabled={isSending || isRecording}
-                        className={cn(
-                            "flex-shrink-0 h-10 w-10 rounded-xl flex items-center justify-center transition-all duration-200",
-                            "bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400",
-                            "hover:bg-gray-200 dark:hover:bg-gray-700 hover:text-primary-500",
-                            "disabled:opacity-50 disabled:cursor-not-allowed"
+                    <form onSubmit={handleSend} className="flex items-center gap-2">
+                        {/* Image Picker Button */}
+                        <button
+                            type="button"
+                            onClick={() => imageInputRef.current?.click()}
+                            disabled={isSending || isRecording}
+                            className={cn(
+                                "flex-shrink-0 h-10 w-10 rounded-xl flex items-center justify-center transition-all duration-200",
+                                "bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400",
+                                "hover:bg-gray-200 dark:hover:bg-gray-700 hover:text-primary-500",
+                                "disabled:opacity-50 disabled:cursor-not-allowed"
+                            )}
+                        >
+                            <ImagePlus className="h-5 w-5" />
+                        </button>
+
+                        {/* Input or Recording UI */}
+                        {isRecording ? (
+                            <div className="flex-1 min-w-0">
+                                <VoiceRecorder
+                                    onRecordingComplete={handleRecordingComplete}
+                                    onRecordingStart={() => setIsRecording(true)}
+                                    onRecordingCancel={() => setIsRecording(false)}
+                                    disabled={isSending}
+                                />
+                            </div>
+                        ) : pendingAudio ? (
+                            // Audio preview
+                            <div className="flex-1 flex items-center gap-2 bg-gray-100 dark:bg-gray-900 rounded-xl px-3 py-2 border border-purple-300 dark:border-purple-500/50">
+                                <div className="flex items-center gap-2 text-purple-600 dark:text-purple-400">
+                                    <Mic className="h-4 w-4" />
+                                    <span className="text-sm font-medium">Voice message</span>
+                                    <span className="text-xs text-gray-500">({pendingAudio.duration}s)</span>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={clearAudio}
+                                    className="ml-auto p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full transition-colors"
+                                >
+                                    <X className="h-4 w-4 text-gray-500" />
+                                </button>
+                            </div>
+                        ) : (
+                            // Normal text input
+                            <div className="flex-1 min-w-0 relative group">
+                                {/* Gradient border glow on focus */}
+                                <div className="absolute -inset-0.5 bg-gradient-to-r from-primary-500 via-purple-500 to-pink-500 rounded-2xl opacity-0 group-focus-within:opacity-100 blur transition-opacity duration-300" />
+
+                                {/* Input container */}
+                                <div className="relative flex items-center bg-gray-100 dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 group-focus-within:border-transparent transition-colors">
+                                    <input
+                                        ref={inputRef}
+                                        type="text"
+                                        value={newMessage}
+                                        onChange={handleInputChange}
+                                        placeholder={imagePreview ? "Add a caption..." : replyingTo ? "Type your reply..." : "Type a message..."}
+                                        className="flex-1 min-w-0 h-10 px-4 bg-transparent text-sm text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none"
+                                        disabled={isSending}
+                                    />
+                                </div>
+                            </div>
                         )}
-                    >
-                        <ImagePlus className="h-5 w-5" />
-                    </button>
 
-                    {/* Input or Recording UI */}
-                    {isRecording ? (
-                        <div className="flex-1 min-w-0">
+                        {/* Smart Send/Mic Button */}
+                        {(newMessage.trim() || selectedImage || pendingAudio) ? (
+                            // Send button when there's content
+                            <button
+                                type="submit"
+                                disabled={isSending}
+                                className={cn(
+                                    "relative flex-shrink-0 h-10 w-10 rounded-xl flex items-center justify-center transition-all duration-300",
+                                    "bg-gradient-to-br from-primary-500 via-primary-600 to-purple-600",
+                                    "hover:shadow-lg hover:shadow-primary-500/30 hover:scale-105",
+                                    "active:scale-95",
+                                    "disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:hover:shadow-none"
+                                )}
+                            >
+                                {/* Button shine effect */}
+                                <div className="absolute inset-0 rounded-xl overflow-hidden">
+                                    <div className="absolute top-0 left-0 right-0 h-1/2 bg-gradient-to-b from-white/20 to-transparent" />
+                                </div>
+
+                                {/* Icon */}
+                                <Send className="h-5 w-5 text-white relative translate-x-0.5 -translate-y-0.5" />
+                            </button>
+                        ) : (
+                            // Mic button when input is empty
                             <VoiceRecorder
                                 onRecordingComplete={handleRecordingComplete}
                                 onRecordingStart={() => setIsRecording(true)}
                                 onRecordingCancel={() => setIsRecording(false)}
                                 disabled={isSending}
                             />
-                        </div>
-                    ) : pendingAudio ? (
-                        // Audio preview
-                        <div className="flex-1 flex items-center gap-2 bg-gray-100 dark:bg-gray-900 rounded-xl px-3 py-2 border border-purple-300 dark:border-purple-500/50">
-                            <div className="flex items-center gap-2 text-purple-600 dark:text-purple-400">
-                                <Mic className="h-4 w-4" />
-                                <span className="text-sm font-medium">Voice message</span>
-                                <span className="text-xs text-gray-500">({pendingAudio.duration}s)</span>
-                            </div>
-                            <button
-                                type="button"
-                                onClick={clearAudio}
-                                className="ml-auto p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full transition-colors"
-                            >
-                                <X className="h-4 w-4 text-gray-500" />
-                            </button>
-                        </div>
-                    ) : (
-                        // Normal text input
-                        <div className="flex-1 min-w-0 relative group">
-                            {/* Gradient border glow on focus */}
-                            <div className="absolute -inset-0.5 bg-gradient-to-r from-primary-500 via-purple-500 to-pink-500 rounded-2xl opacity-0 group-focus-within:opacity-100 blur transition-opacity duration-300" />
-
-                            {/* Input container */}
-                            <div className="relative flex items-center bg-gray-100 dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 group-focus-within:border-transparent transition-colors">
-                                <input
-                                    ref={inputRef}
-                                    type="text"
-                                    value={newMessage}
-                                    onChange={handleInputChange}
-                                    placeholder={imagePreview ? "Add a caption..." : replyingTo ? "Type your reply..." : "Type a message..."}
-                                    className="flex-1 min-w-0 h-10 px-4 bg-transparent text-sm text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none"
-                                    disabled={isSending}
-                                />
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Smart Send/Mic Button */}
-                    {(newMessage.trim() || selectedImage || pendingAudio) ? (
-                        // Send button when there's content
-                        <button
-                            type="submit"
-                            disabled={isSending}
-                            className={cn(
-                                "relative flex-shrink-0 h-10 w-10 rounded-xl flex items-center justify-center transition-all duration-300",
-                                "bg-gradient-to-br from-primary-500 via-primary-600 to-purple-600",
-                                "hover:shadow-lg hover:shadow-primary-500/30 hover:scale-105",
-                                "active:scale-95",
-                                "disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:hover:shadow-none"
-                            )}
-                        >
-                            {/* Button shine effect */}
-                            <div className="absolute inset-0 rounded-xl overflow-hidden">
-                                <div className="absolute top-0 left-0 right-0 h-1/2 bg-gradient-to-b from-white/20 to-transparent" />
-                            </div>
-
-                            {/* Icon */}
-                            <Send className="h-5 w-5 text-white relative translate-x-0.5 -translate-y-0.5" />
-                        </button>
-                    ) : (
-                        // Mic button when input is empty
-                        <VoiceRecorder
-                            onRecordingComplete={handleRecordingComplete}
-                            onRecordingStart={() => setIsRecording(true)}
-                            onRecordingCancel={() => setIsRecording(false)}
-                            disabled={isSending}
-                        />
-                    )}
-                </form>
+                        )}
+                    </form>
+                </div>
             </div>
         </div>
     );
 }
-

@@ -5,14 +5,16 @@ import { ConversationList } from './conversation-list';
 import { cn } from '@/lib/utils';
 import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
+import { Navbar } from '@/components/layout/Navbar';
 
 interface MessagesLayoutContentProps {
     children: React.ReactNode;
     conversations: any[];
     currentUserId: string;
+    userProfile: any;
 }
 
-export function MessagesLayoutContent({ children, conversations: initialConversations, currentUserId }: MessagesLayoutContentProps) {
+export function MessagesLayoutContent({ children, conversations: initialConversations, currentUserId, userProfile }: MessagesLayoutContentProps) {
     const pathname = usePathname();
     const isChatOpen = pathname !== '/messages';
     const [conversations, setConversations] = useState(initialConversations);
@@ -35,8 +37,6 @@ export function MessagesLayoutContent({ children, conversations: initialConversa
                         const conversationIndex = prev.findIndex(c => c.id === newMsg.conversation_id);
 
                         if (conversationIndex === -1) {
-                            // New conversation or one we don't have loaded? 
-                            // Ideally we should fetch it, but for now we ignore to avoid complexity
                             return prev;
                         }
 
@@ -46,7 +46,6 @@ export function MessagesLayoutContent({ children, conversations: initialConversa
                             updated_at: newMsg.created_at
                         };
 
-                        // Remove old entry and add new one at top
                         const newConversations = [...prev];
                         newConversations.splice(conversationIndex, 1);
                         return [updatedConversation, ...newConversations];
@@ -61,22 +60,31 @@ export function MessagesLayoutContent({ children, conversations: initialConversa
     }, [supabase]);
 
     return (
-        <div className={cn(
-            "flex-1 flex max-w-7xl mx-auto w-full md:h-[calc(100vh-4rem)] md:pb-0 overflow-x-hidden",
-            isChatOpen ? "h-[calc(100dvh-3.5rem)]" : "h-[calc(100dvh-7.5rem)]"
-        )}>
+        <>
+            {/* Mobile Navbar - only show when NOT in a chat */}
+            {!isChatOpen && (
+                <div className="md:hidden">
+                    <Navbar user={userProfile} />
+                </div>
+            )}
+
             <div className={cn(
-                "w-full md:w-1/3 lg:w-1/4 border-r border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900",
-                isChatOpen ? "hidden md:flex" : "flex"
+                "flex-1 flex max-w-7xl mx-auto w-full overflow-x-hidden",
+                isChatOpen ? "h-[100dvh] md:h-[calc(100vh-4rem)]" : "h-[calc(100dvh-7.5rem)] md:h-[calc(100vh-4rem)]"
             )}>
-                <ConversationList conversations={conversations} currentUserId={currentUserId} />
+                <div className={cn(
+                    "w-full md:w-1/3 lg:w-1/4 border-r border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900",
+                    isChatOpen ? "hidden md:flex" : "flex"
+                )}>
+                    <ConversationList conversations={conversations} currentUserId={currentUserId} />
+                </div>
+                <div className={cn(
+                    "flex-1 bg-gray-50 dark:bg-gray-900 overflow-hidden",
+                    !isChatOpen ? "hidden md:flex" : "flex"
+                )}>
+                    {children}
+                </div>
             </div>
-            <div className={cn(
-                "flex-1 bg-gray-50 dark:bg-gray-900",
-                !isChatOpen ? "hidden md:flex" : "flex"
-            )}>
-                {children}
-            </div>
-        </div>
+        </>
     );
 }

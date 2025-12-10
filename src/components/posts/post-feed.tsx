@@ -53,14 +53,14 @@ export function PostFeed({ initialPosts = [], currentUserId, feedType }: PostFee
     if (posts.length === 0 && !loading) {
         return (
             <ScrollReveal direction="up" duration={0.6}>
-                <div className="rounded-2xl border border-gray-200 bg-white p-12 text-center shadow-sm dark:border-gray-700 dark:bg-gray-800">
+                <div className="rounded-2xl glass-light p-12 text-center shadow-lg">
                     <div className="mx-auto max-w-md">
-                        <div className="mb-4 text-6xl">📝</div>
+                        <div className="mb-4 text-6xl animate-float">🌟</div>
                         <h3 className="mb-2 text-xl font-semibold text-gray-900 dark:text-white">
-                            No posts yet
+                            Your feed is ready
                         </h3>
-                        <p className="text-gray-600 dark:text-gray-400">
-                            Be the first to share something with the community!
+                        <p className="text-gray-500 dark:text-gray-400">
+                            Follow some people or create your first post to get started!
                         </p>
                     </div>
                 </div>
@@ -70,7 +70,7 @@ export function PostFeed({ initialPosts = [], currentUserId, feedType }: PostFee
 
     return (
         <>
-            <div className="space-y-4">
+            <div className="space-y-6">
                 {posts.map((post, index) => (
                     <ScrollReveal
                         key={post.id}

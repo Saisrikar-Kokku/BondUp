@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { useState, memo } from 'react';
 import { useRouter } from 'next/navigation';
 import type { PostWithInteractions } from '@/types/database.types';
 import { formatRelativeTime } from '@/lib/utils/date';
@@ -18,7 +18,7 @@ interface PostCardProps {
     onEdit?: (post: PostWithInteractions) => void;
 }
 
-export function PostCard({ post, currentUserId, onEdit }: PostCardProps) {
+function PostCardComponent({ post, currentUserId, onEdit }: PostCardProps) {
     const router = useRouter();
     const [deleting, setDeleting] = useState(false);
     const [showMenu, setShowMenu] = useState(false);
@@ -55,7 +55,7 @@ export function PostCard({ post, currentUserId, onEdit }: PostCardProps) {
     };
 
     return (
-        <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+        <div className="rounded-2xl glass-light card-hover gradient-border p-6 shadow-lg dark:shadow-xl">
             {/* Header */}
             <div className="mb-4 flex items-start justify-between">
                 <Link
@@ -63,14 +63,18 @@ export function PostCard({ post, currentUserId, onEdit }: PostCardProps) {
                     className="flex items-center gap-3 hover:opacity-80"
                 >
                     {post.profiles.avatar_url ? (
-                        <img
-                            src={post.profiles.avatar_url}
-                            alt={post.profiles.username}
-                            className="h-12 w-12 rounded-full object-cover"
-                        />
+                        <div className="avatar-ring">
+                            <img
+                                src={post.profiles.avatar_url}
+                                alt={post.profiles.username}
+                                className="h-11 w-11 rounded-full object-cover"
+                            />
+                        </div>
                     ) : (
-                        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-primary-500 to-secondary-500 text-lg font-bold text-white">
-                            {post.profiles.username.charAt(0).toUpperCase()}
+                        <div className="avatar-ring">
+                            <div className="flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br from-primary-500 to-secondary-500 text-lg font-bold text-white">
+                                {post.profiles.username.charAt(0).toUpperCase()}
+                            </div>
                         </div>
                     )}
                     <div>
@@ -97,7 +101,7 @@ export function PostCard({ post, currentUserId, onEdit }: PostCardProps) {
                         </button>
 
                         {showMenu && (
-                            <div className="absolute right-0 z-10 mt-2 w-48 rounded-lg border border-gray-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-800">
+                            <div className="absolute right-0 z-10 mt-2 w-48 rounded-xl glass shadow-xl overflow-hidden animate-in">
                                 <button
                                     onClick={() => {
                                         setShowMenu(false);
@@ -145,7 +149,7 @@ export function PostCard({ post, currentUserId, onEdit }: PostCardProps) {
                 />
                 <button
                     onClick={toggleComments}
-                    className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors hover:bg-gray-100 dark:hover:bg-gray-700"
+                    className="flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium transition-all hover:bg-gray-100/80 dark:hover:bg-gray-700/80 interactive-glow"
                 >
                     <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path
@@ -172,3 +176,14 @@ export function PostCard({ post, currentUserId, onEdit }: PostCardProps) {
         </div>
     );
 }
+
+// Memoize to prevent unnecessary re-renders
+export const PostCard = memo(PostCardComponent, (prevProps, nextProps) => {
+    return (
+        prevProps.post.id === nextProps.post.id &&
+        prevProps.post.like_count === nextProps.post.like_count &&
+        prevProps.post.comment_count === nextProps.post.comment_count &&
+        prevProps.post.user_has_liked === nextProps.post.user_has_liked &&
+        prevProps.currentUserId === nextProps.currentUserId
+    );
+});

@@ -151,7 +151,7 @@ export function CreatePost() {
 
     return (
         <>
-            <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+            <div className="rounded-2xl glass-light p-6 shadow-lg">
                 <form onSubmit={handleSubmit}>
                     <Textarea
                         value={content}

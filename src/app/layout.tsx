@@ -5,6 +5,7 @@ import './globals.css';
 import { NotificationProvider } from '@/contexts/NotificationProvider';
 import { NavigationProgress } from '@/components/ui/NavigationProgress';
 import { SessionManager } from '@/components/auth/session-manager';
+import { ThemeProvider } from '@/components/providers/theme-provider';
 
 const inter = Inter({
     subsets: ['latin'],
@@ -55,15 +56,21 @@ export default function RootLayout({
                 <meta name="theme-color" content="#8B5CF6" />
             </head>
             <body className={`${inter.variable} font-sans antialiased`}>
-                <NotificationProvider>
-                    <SessionManager>
-                        <Suspense fallback={null}>
-                            <NavigationProgress />
-                        </Suspense>
-                        <PushNotificationPrompt />
-                        {children}
-                    </SessionManager>
-                </NotificationProvider>
+                <ThemeProvider
+                    attribute="class"
+                    defaultTheme="system"
+                    enableSystem
+                >
+                    <NotificationProvider>
+                        <SessionManager>
+                            <Suspense fallback={null}>
+                                <NavigationProgress />
+                            </Suspense>
+                            <PushNotificationPrompt />
+                            {children}
+                        </SessionManager>
+                    </NotificationProvider>
+                </ThemeProvider>
             </body>
         </html>
     );

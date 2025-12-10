@@ -17,7 +17,7 @@ const nextConfig = {
     experimental: {
         optimizePackageImports: ['lucide-react', 'date-fns'],
         serverActions: {
-            bodySizeLimit: '8mb', // Allow up to 8MB for image uploads
+            bodySizeLimit: '50mb', // Allow up to 50MB for video uploads
         },
     },
 

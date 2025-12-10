@@ -41,9 +41,8 @@ export function VoiceRecorder({
                         setPermissionState(result.state as 'prompt' | 'granted' | 'denied');
                     });
                 }
-            } catch (error) {
+            } catch {
                 // Permissions API not supported, will request on click
-                console.log('Permissions API not supported');
             }
         };
 

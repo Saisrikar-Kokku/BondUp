@@ -30,12 +30,10 @@ export function LogoutButton({ children, className, onLogoutStart }: LogoutButto
             const supabase = createClient();
             await supabase.auth.signOut();
 
-            // Redirect to home
-            router.push('/');
-            router.refresh();
+            // Force full page navigation to landing page
+            window.location.href = '/';
         } catch (error) {
             console.error('Logout error:', error);
-        } finally {
             setLoading(false);
         }
     };

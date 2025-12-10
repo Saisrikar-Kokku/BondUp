@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, memo } from 'react';
 import { format, formatDistanceToNow } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { deleteMessage } from '@/lib/actions/messages';
@@ -48,7 +48,7 @@ interface MessageBubbleProps {
 
 const SWIPE_THRESHOLD = 60;
 
-export function MessageBubble({
+function MessageBubbleComponent({
     message,
     isOwn,
     showSeen,
@@ -527,3 +527,15 @@ export function MessageBubble({
         </React.Fragment>
     );
 }
+
+// Memoize for optimal chat scroll performance
+export const MessageBubble = memo(MessageBubbleComponent, (prevProps, nextProps) => {
+    return (
+        prevProps.message.id === nextProps.message.id &&
+        prevProps.message.content === nextProps.message.content &&
+        prevProps.isOwn === nextProps.isOwn &&
+        prevProps.showSeen === nextProps.showSeen &&
+        prevProps.readAt === nextProps.readAt &&
+        JSON.stringify(prevProps.message.reactions) === JSON.stringify(nextProps.message.reactions)
+    );
+});
